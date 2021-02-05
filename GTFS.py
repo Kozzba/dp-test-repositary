@@ -75,10 +75,10 @@ class GTFS:
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&GTFS load')
+        self.menu = self.tr(u'&GTFS load - test')
         # TODO: We are going to let the user set this up in a future iteration
-        self.toolbar = self.iface.addToolBar(u'GTFS')
-        self.toolbar.setObjectName(u'GTFS')
+        self.toolbar = self.iface.addToolBar(u'GTFS - test')
+        self.toolbar.setObjectName(u'GTFS - test')
 
         #print "** INITIALIZING GTFS"
 
@@ -168,7 +168,7 @@ class GTFS:
         icon_path = ':/plugins/GTFS/icon.png'
         self.add_action(
             icon_path,
-            text=self.tr(u'GTFS Load'),
+            text=self.tr(u'GTFS Load - test'),
             callback=self.run,
             parent=self.iface.mainWindow())
 
@@ -198,7 +198,7 @@ class GTFS:
 
         for action in self.actions:
             self.iface.removePluginMenu(
-                self.tr(u'&GTFS load'),
+                self.tr(u'&GTFS load - test'),
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
