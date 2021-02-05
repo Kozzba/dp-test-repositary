@@ -1,0 +1,6 @@
+__pycache__/
+*.gpkg
+help/build
+*~
+*-shm
+*-wal
