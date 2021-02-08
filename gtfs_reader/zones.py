@@ -1,6 +1,7 @@
 from qgis import processing
 from qgis.core import QgsVectorLayer, QgsProject, QgsVectorFileWriter, QgsCoordinateReferenceSystem, QgsLayerTreeLayer
 
+
 class GtfsZones:
     def __init__(self, gpkg_path):
         self.gpkg_path = gpkg_path
@@ -14,7 +15,38 @@ class GtfsZones:
 
         layer_voronoi = self._createVectorLayer('voronoi')
 
-        zones = ['P', '0', 'B', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
+        expression = "\"zone_id\" in ('P','0','B')"
+        _layer_stops.selectByExpression(expression)
+
+        self._saveIntoGpkg(_layer_stops,'layer_stops_selected')
+
+        layer_stops_selected = self._createVectorLayer('layer_stops_selected')
+
+        processing.run("native:deleteduplicategeometries", {
+            'INPUT': layer_stops_selected,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B\" (geom)'})
+
+        layer_zoneP0B = self._createVectorLayer('zoneP0B')
+
+        # select voronoi polygons intersect with stops
+        processing.run("qgis:selectbylocation", {
+            'INPUT': layer_voronoi,
+            'INTERSECT': layer_zoneP0B,
+            'METHOD': 0,
+            'PREDICATE': [0]})
+
+        self._saveIntoGpkg(layer_voronoi, 'zoneP0B_voronoi')
+
+        layer_zoneP0B_voronoi = self._createVectorLayer('zoneP0B_voronoi')
+
+        # combine features into new features
+        processing.run("qgis:dissolve", {
+            'FIELD': [],
+            'INPUT': layer_zoneP0B_voronoi,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_voronoi_dissolve\" (geom)'})
+
+        zones = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
         for i in zones:
             # select stops by zone_id
@@ -47,23 +79,26 @@ class GtfsZones:
                 'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_voronoi_dissolve\" (geom)'})
 
         self._deleteLayer('voronoi')
+        self._deleteLayer('layer_stops_selected')
         for i in zones:
-            self._deleteLayer('zone' + i)
-            self._deleteLayer('zone' + i + '_voronoi')
+                self._deleteLayer('zone' + i)
+                self._deleteLayer('zone' + i + '_voronoi')
+        self._deleteLayer('zoneP0B')
+        self._deleteLayer('zoneP0B_voronoi')
 
-        # merge layers of zone P,0 and B
-        merge = processing.run("qgis:mergevectorlayers", {'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
-                                                          'LAYERS': [
-                                                              self.gpkg_path + '|layername=zone0_voronoi_dissolve',
-                                                              self.gpkg_path + '|layername=zoneB_voronoi_dissolve',
-                                                              self.gpkg_path + '|layername=zoneP_voronoi_dissolve'],
-                                                          'OUTPUT': 'TEMPORARY_OUTPUT'})
-
-        # combine features into new features
-        processing.run("qgis:dissolve", {
-            'FIELD': [],
-            'INPUT': merge['OUTPUT'],
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_voronoi_dissolve\" (geom)'})
+        # # merge layers of zone P,0 and B
+        # merge = processing.run("qgis:mergevectorlayers", {'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
+        #                                                   'LAYERS': [
+        #                                                       self.gpkg_path + '|layername=zone0_voronoi_dissolve',
+        #                                                       self.gpkg_path + '|layername=zoneB_voronoi_dissolve',
+        #                                                       self.gpkg_path + '|layername=zoneP_voronoi_dissolve'],
+        #                                                   'OUTPUT': 'TEMPORARY_OUTPUT'})
+        #
+        # # combine features into new features
+        # processing.run("qgis:dissolve", {
+        #     'FIELD': [],
+        #     'INPUT': merge['OUTPUT'],
+        #     'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_voronoi_dissolve\" (geom)'})
 
         # merge layers of all zones
         list_zones = []
