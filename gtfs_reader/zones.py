@@ -16,8 +16,7 @@ class GtfsZones:
         layer_voronoi = self._createVectorLayer('voronoi')
 
         _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
-        expression = "\"zone_id\" in ('P','0','B')"
-        _layer_stops.selectByExpression(expression)
+        _layer_stops.selectByExpression("\"zone_id\" in ('P','0','B')")
 
         self._saveIntoGpkg(_layer_stops,'layer_stops_selected')
 
@@ -45,6 +44,24 @@ class GtfsZones:
             'FIELD': [],
             'INPUT': layer_zoneP0B_voronoi,
             'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_voronoi_dissolve\" (geom)'})
+
+        layer_zoneP0B_voronoi_dissolve = self._createVectorLayer('zoneP0B_voronoi_dissolve')
+
+        processing.run("native:multiparttosingleparts", {
+            'INPUT': layer_zoneP0B_voronoi_dissolve,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_singleparts\" (geom)'})
+
+        layer_zoneP0B_singleparts = self._createVectorLayer('zoneP0B_singleparts')
+
+        layer_zoneP0B_singleparts.selectByExpression('$area = maximum($area, "zone_id")')
+
+        self._saveIntoGpkg(layer_zoneP0B_singleparts,'zoneP0B_max')
+
+        layer_zoneP0B_max = self._createVectorLayer('zoneP0B_max')
+
+        processing.run("native:deleteholes", {
+            'INPUT': layer_zoneP0B_max, 'MIN_AREA': 500,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_without_holes\" (geom)'})
 
         zones = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
@@ -85,6 +102,9 @@ class GtfsZones:
                 self._deleteLayer('zone' + i + '_voronoi')
         self._deleteLayer('zoneP0B')
         self._deleteLayer('zoneP0B_voronoi')
+        self._deleteLayer('zoneP0B_singleparts')
+        self._deleteLayer('zoneP0B_max')
+
 
         # # merge layers of zone P,0 and B
         # merge = processing.run("qgis:mergevectorlayers", {'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
@@ -104,7 +124,7 @@ class GtfsZones:
         list_zones = []
         for i in zones:
             list_zones.append(self.gpkg_path + '|layername=zone' + i + '_voronoi_dissolve')
-        list_zones.append(self.gpkg_path + '|layername=zoneP0B_voronoi_dissolve')
+        list_zones.append(self.gpkg_path + '|layername=zoneP0B_without_holes')
 
         processing.run("qgis:mergevectorlayers", {
             'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
