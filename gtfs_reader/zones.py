@@ -240,10 +240,19 @@ class GtfsZones:
 
             list_zones_smoothed.append(self.gpkg_path + '|layername=zone' + i + '_concaveHull_smoothed')
 
+        list_zones_diff = []
+        for i in range(len(list_zones_smoothed) - 1):
+            processing.run("qgis:difference", {
+                'INPUT': list_zones_smoothed[i+1],
+                'OVERLAY': list_zones_smoothed[i],
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'})
+            list_zones_diff.append(self.gpkg_path + '|layername=zone' + str(i+1) + '_smoothed_diff')
+        list_zones_diff.append(list_zones_smoothed[0])
+
         processing.run("qgis:mergevectorlayers", {
             'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
-            'LAYERS': list_zones_smoothed,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone_smoothed\" (geom)'})
+            'LAYERS': list_zones_diff,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed\" (geom)'})
 
         # grass
         # grass_generalize = processing.run('grass7:v.generalize',
