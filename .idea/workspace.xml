@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e2b068b1-f1b7-4d9e-98ab-9bbe611ad47d" name="Default Changelist" comment="deleting holes in zone P,0,B">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gtfs_reader/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/gtfs_reader/zones.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/PID_GTFS.zip" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/PID_GTFS.zip" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
