@@ -74,9 +74,9 @@ class GtfsZones:
                                                       'OPERATOR': 0,
                                                       'VALUE': '' + i + ''})
 
-            self._saveIntoGpkg(_layer_stops, 'zone' + i)
+            self._saveIntoGpkg(_layer_stops, 'stops_zone' + i)
 
-            layer_zoneI = self._createVectorLayer('zone' + i)
+            layer_zoneI = self._createVectorLayer('stops_zone' + i)
 
             # select voronoi polygons intersect with stops
             processing.run("qgis:selectbylocation", {
@@ -95,11 +95,11 @@ class GtfsZones:
                 'INPUT': layer_zoneI_voronoi,
                 'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_voronoi_dissolve\" (geom)'})
 
-        self._deleteLayer('voronoi')
-        self._deleteLayer('layer_stops_selected')
-        for i in zones:
-                self._deleteLayer('zone' + i)
-                self._deleteLayer('zone' + i + '_voronoi')
+        # self._deleteLayer('voronoi')
+        # self._deleteLayer('layer_stops_selected')
+        # for i in zones:
+                # self._deleteLayer('stops_zone' + i)
+                # self._deleteLayer('zone' + i + '_voronoi')
         self._deleteLayer('zoneP0B')
         self._deleteLayer('zoneP0B_voronoi')
         self._deleteLayer('zoneP0B_singleparts')
@@ -141,8 +141,8 @@ class GtfsZones:
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(zones_layer))
 
         self._deleteLayer('zoneP0B_voronoi_dissolve')
-        for i in zones:
-            self._deleteLayer('zone' + i + '_voronoi_dissolve')
+        # for i in zones:
+        #     self._deleteLayer('zone' + i + '_voronoi_dissolve')
 
         self._lang()
 
@@ -187,41 +187,91 @@ class GtfsZones:
                                       'MIN_AREA': 30,
                                       'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"deleteHoles\" (geom)'})
 
-        # qgis
+        zones = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-        # smooth = processing.run('qgis:smoothgeometry',
-        #         { 'INPUT': deleteHoles['OUTPUT'],
-        #           'ITERATIONS': 10,
-        #           'OFFSET': 0.25,
-        #           'MAX_ANGLE': 180,
-        #           'OUTPUT': 'ogr:dbname=\''+ self.gpkg_path +'\' table=\"smooth\" (geom)'})
+        list_zones_smoothed = []
 
-        # # extract vertices (polygon to nodes)
-        # processing.run('qgis: extractvertices',
-        #                { 'INPUT': self.gpkg_path + '|layername=zones',
-        #                  'OUTPUT' : 'TEMPORARY_OUTPUT' })
+        for i in zones:
+            # extract vertices (polygon to nodes)
+            processing.run('qgis:extractvertices',
+                           {'INPUT': self.gpkg_path + '|layername=zone' + i + '_voronoi_dissolve',
+                            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_vertices\" (geom)'})
+
+            layer_stops = self._createVectorLayer('stops')
+            layer_stops.selectByExpression("zone_id LIKE '" + i + ",%' OR zone_id LIKE '%," + i + "'")
+            self._saveIntoGpkg(layer_stops,'stops_border_zone' + i)
+
+            # extract_vertices = self._createVectorLayer('extractVertices')
+            # extract_vertices.selectByExpression('zone_id = ' + i)
+            # self._saveIntoGpkg(extract_vertices, 'zone' + i + '_vertices')
+
+            # merge stops_zoneI + stops_border_zoneI + zoneI_vertices
+            zoneI_vertices_stops = []
+            zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_zone' + i)
+            zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_border_zone' + i)
+            zoneI_vertices_stops.append(self.gpkg_path + '|layername=zone' + i + '_vertices')
+
+            processing.run("qgis:mergevectorlayers", {
+                'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
+                'LAYERS': zoneI_vertices_stops,
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_vertices_stops\" (geom)'})
+
+            processing.run("qgis:concavehull", {
+                'INPUT': self.gpkg_path + '|layername=zone' + i + '_vertices_stops',
+                'ALPHA': 0.09,
+                'HOLES': False,
+                'NO_MULTIGEOMETRY': True,
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_concaveHull\" (geom)'
+            })
+
+            processing.run("qgis:simplifygeometries", {
+                'INPUT': self.gpkg_path + '|layername=zone' + i + '_concaveHull',
+                'METHOD': 0,
+                'TOLERANCE': 0.005,
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_concaveHull_simplified\" (geom)'
+            })
+
+            processing.run('qgis:smoothgeometry', {
+                'INPUT': self.gpkg_path + '|layername=zone' + i + '_concaveHull_simplified',
+                'ITERATIONS': 10,
+                'OFFSET': 0.25,
+                'MAX_ANGLE': 180,
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_concaveHull_smoothed\" (geom)'})
+
+            list_zones_smoothed.append(self.gpkg_path + '|layername=zone' + i + '_concaveHull_smoothed')
+
+        processing.run("qgis:mergevectorlayers", {
+            'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
+            'LAYERS': list_zones_smoothed,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone_smoothed\" (geom)'})
 
         # grass
-        grass_generalize = processing.run('grass7:v.generalize',
-                                          {'input': delete_holes['OUTPUT'],
-                                           'method': 2,
-                                           'threshold': 1,
-                                           'output': 'TEMPORARY_OUTPUT',
-                                           'error': 'TEMPORARY_OUTPUT'})
+        # grass_generalize = processing.run('grass7:v.generalize',
+        #                                   {'input': delete_holes['OUTPUT'],
+        #                                    'method': 2,
+        #                                    'threshold': 1,
+        #                                    'output': 'TEMPORARY_OUTPUT',
+        #                                    'error': 'TEMPORARY_OUTPUT'})
+        #
+        # grass_generalize_converted = processing.run('gdal:convertformat', {
+        #     'INPUT': grass_generalize['output'],
+        #     'OPTIONS': '',
+        #     'OUTPUT': 'grass_generalize_converted.shp'})
 
-        grass_generalize_converted = processing.run('gdal:convertformat', {
-            'INPUT': grass_generalize['output'],
-            'OPTIONS': '',
-            'OUTPUT': 'grass_generalize_converted.shp'})
 
-        grass_generalize_converted_toGpkg = QgsVectorLayer(grass_generalize_converted['OUTPUT'],
-                                                           'grass_generalize_lang', "ogr")
+        # grass_generalize_converted_toGpkg = QgsVectorLayer(grass_generalize_converted['OUTPUT'],
+        #                                                    'grass_generalize_lang', "ogr")
+
+
+
         # self._saveIntoGpkg(grass_generalize_converted_toGpkg,'grass_generalize_lang')
         # grass_generalize_convertedd = QgsVectorLayer(grass_generalize_converted['OUTPUT'], 'grass_generalize_lang', "ogr")
         # grass_generalize_converted_toMap = QgsVectorLayer(self.gpkg_path + '|layername=grass_generalize_lang', 'grass_generalize_lang', "ogr")
 
-        generalize_layer = QgsProject.instance().addMapLayer(grass_generalize_converted_toGpkg, False)
 
-        root = QgsProject.instance().layerTreeRoot()
-        group_gtfs = root.findGroup('zones')
-        group_gtfs.insertChildNode(0, QgsLayerTreeLayer(generalize_layer))
+
+        # generalize_layer = QgsProject.instance().addMapLayer(grass_generalize_converted_toGpkg, False)
+        #
+        # root = QgsProject.instance().layerTreeRoot()
+        # group_gtfs = root.findGroup('zones')
+        # group_gtfs.insertChildNode(0, QgsLayerTreeLayer(generalize_layer))
