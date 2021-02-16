@@ -178,7 +178,8 @@ class GtfsZones:
             processing.run("qgis:difference", {
                 'INPUT': list_zones_smoothed[i+1],
                 'OVERLAY': list_zones_smoothed[i],
-                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'})
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'
+            })
             list_zones_diff.append(self.gpkg_path + '|layername=zone' + str(i+1) + '_smoothed_diff')
         list_zones_diff.append(list_zones_smoothed[0])
         list_zones_diff.append(self.gpkg_path + '|layername=zoneP0B_concaveHull_smoothed')
@@ -189,9 +190,15 @@ class GtfsZones:
             'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed\" (geom)'
         })
 
+        processing.run("qgis:collect", {
+            'INPUT': self.gpkg_path + '|layername=zones_smoothed',
+            'FIELD': ['zone_id'],
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed_collected\" (geom)'
+        })
+
         root = QgsProject.instance().layerTreeRoot()
         group_gtfs = root.findGroup('zones')
-        smooth_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones_smoothed'), False)
+        smooth_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones_smoothed_collected'), False)
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(smooth_layer))
 
 
@@ -240,3 +247,13 @@ class GtfsZones:
             'MAX_ANGLE': 180,
             'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_concaveHull_smoothed\" (geom)'
         })
+
+        layer = self._createVectorLayer('zone' + zones_name + '_concaveHull_smoothed')
+
+        layer.startEditing()
+        zone_id_idx = layer.fields().lookupField('zone_id')
+        for feat in layer.getFeatures():
+            layer.changeAttributeValue(feat.id(), zone_id_idx, zones_name)
+        layer.commitChanges()
+
+        self._saveIntoGpkg(layer,'zone' + zones_name + '_concaveHull_smoothed')

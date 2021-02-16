@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e2b068b1-f1b7-4d9e-98ab-9bbe611ad47d" name="Default Changelist" comment="deleting holes in zone P,0,B">
+    <list default="true" id="e2b068b1-f1b7-4d9e-98ab-9bbe611ad47d" name="Default Changelist" comment="code refactoring">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gtfs_reader/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/gtfs_reader/zones.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/PID_GTFS.zip" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/PID_GTFS.zip" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -81,7 +81,35 @@
       <option name="project" value="LOCAL" />
       <updated>1612873622919</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="merge smoothed layers into one">
+      <created>1613428219058</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1613428219058</updated>
+    </task>
+    <task id="LOCAL-00005" summary="merge smoothed layers into one">
+      <created>1613428394414</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1613428394414</updated>
+    </task>
+    <task id="LOCAL-00006" summary="add zone P0B to merged smooth layers">
+      <created>1613474860679</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1613474860679</updated>
+    </task>
+    <task id="LOCAL-00007" summary="code refactoring">
+      <created>1613496662765</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1613496662765</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -100,6 +128,9 @@
     <MESSAGE value="rename title of plugin" />
     <MESSAGE value="fix duplicate stops in tariff zones P,0,B" />
     <MESSAGE value="deleting holes in zone P,0,B" />
-    <option name="LAST_COMMIT_MESSAGE" value="deleting holes in zone P,0,B" />
+    <MESSAGE value="merge smoothed layers into one" />
+    <MESSAGE value="add zone P0B to merged smooth layers" />
+    <MESSAGE value="code refactoring" />
+    <option name="LAST_COMMIT_MESSAGE" value="code refactoring" />
   </component>
 </project>
