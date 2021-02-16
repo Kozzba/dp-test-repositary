@@ -24,9 +24,9 @@ class GtfsZones:
 
         processing.run("native:deleteduplicategeometries", {
             'INPUT': layer_stops_selected,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B\" (geom)'})
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"stops_zoneP0B\" (geom)'})
 
-        layer_zoneP0B = self._createVectorLayer('zoneP0B')
+        layer_zoneP0B = self._createVectorLayer('stops_zoneP0B')
 
         # select voronoi polygons intersect with stops
         processing.run("qgis:selectbylocation", {
@@ -100,7 +100,7 @@ class GtfsZones:
         # for i in zones:
                 # self._deleteLayer('stops_zone' + i)
                 # self._deleteLayer('zone' + i + '_voronoi')
-        self._deleteLayer('zoneP0B')
+        # self._deleteLayer('stops_zoneP0B')
         self._deleteLayer('zoneP0B_voronoi')
         self._deleteLayer('zoneP0B_singleparts')
         self._deleteLayer('zoneP0B_max')
@@ -140,7 +140,7 @@ class GtfsZones:
         group_gtfs = root.findGroup('zones')
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(zones_layer))
 
-        self._deleteLayer('zoneP0B_voronoi_dissolve')
+        # self._deleteLayer('zoneP0B_voronoi_dissolve')
         # for i in zones:
         #     self._deleteLayer('zone' + i + '_voronoi_dissolve')
 
@@ -186,6 +186,51 @@ class GtfsZones:
                                      {'INPUT': densify_by_count['OUTPUT'],
                                       'MIN_AREA': 30,
                                       'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"deleteHoles\" (geom)'})
+
+
+
+        layer_stops = self._createVectorLayer('stops')
+        layer_stops.selectByExpression("zone_id not in ('P', 'B', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9') "
+                                       "and (zone_id like '%B%' or zone_id like '%P%' or zone_id like '%0%')")
+        self._saveIntoGpkg(layer_stops, 'stops_border_zoneP0B')
+
+        processing.run('qgis:extractvertices',
+                       {'INPUT': self.gpkg_path + '|layername=zoneP0B_voronoi_dissolve',
+                        'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_vertices\" (geom)'})
+
+        zoneP0B_vertices_stops = []
+        zoneP0B_vertices_stops.append(self.gpkg_path + '|layername=stops_zoneP0B')
+        zoneP0B_vertices_stops.append(self.gpkg_path + '|layername=stops_border_zoneP0B')
+        zoneP0B_vertices_stops.append(self.gpkg_path + '|layername=zoneP0B_vertices')
+
+        processing.run("qgis:mergevectorlayers", {
+            'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
+            'LAYERS': zoneP0B_vertices_stops,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_vertices_stops\" (geom)'})
+
+        processing.run("qgis:concavehull", {
+            'INPUT': self.gpkg_path + '|layername=zoneP0B_vertices_stops',
+            'ALPHA': 0.09,
+            'HOLES': False,
+            'NO_MULTIGEOMETRY': True,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_concaveHull\" (geom)'
+        })
+
+        processing.run("qgis:simplifygeometries", {
+            'INPUT': self.gpkg_path + '|layername=zoneP0B_concaveHull',
+            'METHOD': 0,
+            'TOLERANCE': 0.005,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_concaveHull_simplified\" (geom)'
+        })
+
+        processing.run('qgis:smoothgeometry', {
+            'INPUT': self.gpkg_path + '|layername=zoneP0B_concaveHull_simplified',
+            'ITERATIONS': 10,
+            'OFFSET': 0.25,
+            'MAX_ANGLE': 180,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_concaveHull_smoothed\" (geom)'})
+
+
 
         zones = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
@@ -248,6 +293,7 @@ class GtfsZones:
                 'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'})
             list_zones_diff.append(self.gpkg_path + '|layername=zone' + str(i+1) + '_smoothed_diff')
         list_zones_diff.append(list_zones_smoothed[0])
+        list_zones_diff.append(self.gpkg_path + '|layername=zoneP0B_concaveHull_smoothed')
 
         processing.run("qgis:mergevectorlayers", {
             'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
