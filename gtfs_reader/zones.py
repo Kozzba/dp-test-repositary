@@ -1,5 +1,6 @@
 from qgis import processing
-from qgis.core import QgsVectorLayer, QgsProject, QgsVectorFileWriter, QgsCoordinateReferenceSystem, QgsLayerTreeLayer
+from qgis.core import QgsVectorLayer, QgsProject, QgsVectorFileWriter, QgsCoordinateReferenceSystem, QgsLayerTreeLayer, \
+    QgsDistanceArea
 
 
 class GtfsZones:
@@ -180,6 +181,22 @@ class GtfsZones:
                 'OVERLAY': list_zones_smoothed[i],
                 'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'
             })
+
+            diff = self._createVectorLayer('zone' + str(i+1) + '_smoothed_diff')
+
+            d = QgsDistanceArea()
+            d.setEllipsoid('WGS84')
+
+            diff.startEditing()
+            feats = []
+            for feat in diff.getFeatures():
+                geom = feat.geometry()
+                if d.measureArea(geom) / 1e6 < 50:
+                    feats.append(feat.id())
+                diff.deleteFeatures(feats)
+            diff.commitChanges()
+            diff.updateExtents()
+
             list_zones_diff.append(self.gpkg_path + '|layername=zone' + str(i+1) + '_smoothed_diff')
         list_zones_diff.append(list_zones_smoothed[0])
         list_zones_diff.append(self.gpkg_path + '|layername=zoneP0B_concaveHull_smoothed')
