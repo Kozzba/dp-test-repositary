@@ -69,9 +69,22 @@ class GtfsZones:
             _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
             processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
                                                       'INPUT': _layer_stops,
-                                                      'METHOD': 0,
                                                       'OPERATOR': 0,
+                                                      'METHOD': 0,
                                                       'VALUE': '' + i + ''})
+
+            # _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
+            # processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
+            #                                           'INPUT': _layer_stops,
+            #                                           'OPERATOR': 5,
+            #                                           'METHOD': 0,
+            #                                           'VALUE': '' + i + ''})
+            #
+            # processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
+            #                                           'INPUT': _layer_stops,
+            #                                           'OPERATOR': 0, # 0 — =, 1 — ≠, 2 — >, 3 — >=, 4 — < , 5 — <=, 6 — begins with, 7 — contains, 8 — is null, 9 — is not null, 10 — does not contain
+            #                                           'METHOD': 2, # 0 — creating new selection, 1 — adding to current selection, 2 — removing from current selection, 3 — selecting within current selection
+            #                                           'VALUE': '-'})
 
             self._saveIntoGpkg(_layer_stops, 'stops_zone' + i)
 
