@@ -215,58 +215,58 @@ class GtfsZones:
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(smooth_layer))
 
 
-    def _smooth_process(self, zones_name, expression):
+    def _smooth_process(self, zone_id, expression):
         layer_stops = self._createVectorLayer('stops')
         layer_stops.selectByExpression(expression)
-        self._saveIntoGpkg(layer_stops, 'stops_border_zone' + zones_name)
+        self._saveIntoGpkg(layer_stops, 'stops_border_zone' + zone_id)
 
         # extract vertices (polygon to nodes)
         processing.run('qgis:extractvertices', {
-            'INPUT': self.gpkg_path + '|layername=zone' + zones_name + '_voronoi_dissolve',
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_vertices\" (geom)'
+            'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_voronoi_dissolve',
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_vertices\" (geom)'
         })
 
         # merge stops_zoneI + stops_border_zoneI + zoneI_vertices
         zoneI_vertices_stops = []
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_zone' + zones_name)
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_border_zone' + zones_name)
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=zone' + zones_name + '_vertices')
+        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_zone' + zone_id)
+        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_border_zone' + zone_id)
+        zoneI_vertices_stops.append(self.gpkg_path + '|layername=zone' + zone_id + '_vertices')
 
         processing.run("qgis:mergevectorlayers", {
             'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
             'LAYERS': zoneI_vertices_stops,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_vertices_stops\" (geom)'
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_vertices_stops\" (geom)'
         })
 
         processing.run("qgis:concavehull", {
-            'INPUT': self.gpkg_path + '|layername=zone' + zones_name + '_vertices_stops',
+            'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_vertices_stops',
             'ALPHA': 0.09,
             'HOLES': False,
             'NO_MULTIGEOMETRY': True,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_concaveHull\" (geom)'
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull\" (geom)'
         })
 
         processing.run("qgis:simplifygeometries", {
-            'INPUT': self.gpkg_path + '|layername=zone' + zones_name + '_concaveHull',
+            'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_concaveHull',
             'METHOD': 0,
             'TOLERANCE': 0.005,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_concaveHull_simplified\" (geom)'
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_simplified\" (geom)'
         })
 
         processing.run('qgis:smoothgeometry', {
-            'INPUT': self.gpkg_path + '|layername=zone' + zones_name + '_concaveHull_simplified',
+            'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_concaveHull_simplified',
             'ITERATIONS': 10,
             'OFFSET': 0.25,
             'MAX_ANGLE': 180,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zones_name + '_concaveHull_smoothed\" (geom)'
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_smoothed\" (geom)'
         })
 
-        layer = self._createVectorLayer('zone' + zones_name + '_concaveHull_smoothed')
+        layer = self._createVectorLayer('zone' + zone_id + '_concaveHull_smoothed')
 
         layer.startEditing()
         zone_id_idx = layer.fields().lookupField('zone_id')
         for feat in layer.getFeatures():
-            layer.changeAttributeValue(feat.id(), zone_id_idx, zones_name)
+            layer.changeAttributeValue(feat.id(), zone_id_idx, zone_id)
         layer.commitChanges()
 
-        self._saveIntoGpkg(layer,'zone' + zones_name + '_concaveHull_smoothed')
+        self._saveIntoGpkg(layer,'zone' + zone_id + '_concaveHull_smoothed')
