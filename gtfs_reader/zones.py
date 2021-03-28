@@ -16,7 +16,7 @@ class GtfsZones:
         })
 
         _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
-        _layer_stops.selectByExpression("\"zone_id\" in ('P','0','B')")
+        _layer_stops.selectByExpression("\"zone_id\" in ('P','0','B') and \"location_type\" = 0")
         self._saveIntoGpkg(_layer_stops,'layer_stops_selected')
 
         layer_stops_selected = self._createVectorLayer('layer_stops_selected')
@@ -67,24 +67,7 @@ class GtfsZones:
         for i in self.zones:
             # select stops by zone_id
             _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
-            processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
-                                                      'INPUT': _layer_stops,
-                                                      'OPERATOR': 0,
-                                                      'METHOD': 0,
-                                                      'VALUE': '' + i + ''})
-
-            # _layer_stops = QgsVectorLayer(layer_stops, "stops", "ogr")
-            # processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
-            #                                           'INPUT': _layer_stops,
-            #                                           'OPERATOR': 5,
-            #                                           'METHOD': 0,
-            #                                           'VALUE': '' + i + ''})
-            #
-            # processing.run("qgis:selectbyattribute", {'FIELD': 'zone_id',
-            #                                           'INPUT': _layer_stops,
-            #                                           'OPERATOR': 0, # 0 — =, 1 — ≠, 2 — >, 3 — >=, 4 — < , 5 — <=, 6 — begins with, 7 — contains, 8 — is null, 9 — is not null, 10 — does not contain
-            #                                           'METHOD': 2, # 0 — creating new selection, 1 — adding to current selection, 2 — removing from current selection, 3 — selecting within current selection
-            #                                           'VALUE': '-'})
+            _layer_stops.selectByExpression("\"zone_id\" = " + i + "and \"location_type\" = 0")
 
             self._saveIntoGpkg(_layer_stops, 'stops_zone' + i)
 
