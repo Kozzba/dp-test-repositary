@@ -227,10 +227,9 @@ class GtfsZones:
         })
 
         # merge stops_zoneI + stops_border_zoneI + zoneI_vertices
-        zoneI_vertices_stops = []
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_zone' + zone_id)
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=stops_border_zone' + zone_id)
-        zoneI_vertices_stops.append(self.gpkg_path + '|layername=zone' + zone_id + '_vertices')
+        zoneI_vertices_stops = [self.gpkg_path + '|layername=stops_zone' + zone_id, 
+                                self.gpkg_path + '|layername=stops_border_zone' + zone_id, 
+                                self.gpkg_path + '|layername=zone' + zone_id + '_vertices']
 
         processing.run("qgis:mergevectorlayers", {
             'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
