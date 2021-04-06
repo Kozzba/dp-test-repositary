@@ -28,28 +28,16 @@ class GtfsZones:
         layer_voronoi = self._createVectorLayer('voronoi')
         layer_zoneP0B = self._createVectorLayer('stops_zoneP0B')
         # select voronoi polygons intersect with stops
-        processing.run("qgis:selectbylocation", {
-            'INPUT': layer_voronoi,
-            'INTERSECT': layer_zoneP0B,
-            'METHOD': 0,
-            'PREDICATE': [0]
-        })
+        self._selectbylocation(layer_voronoi, layer_zoneP0B)
 
         self._saveIntoGpkg(layer_voronoi, 'zoneP0B_voronoi')
 
         layer_zoneP0B_voronoi = self._createVectorLayer('zoneP0B_voronoi')
         # combine features into new features
-        processing.run("qgis:dissolve", {
-            'FIELD': [],
-            'INPUT': layer_zoneP0B_voronoi,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_voronoi_dissolve\" (geom)'
-        })
+        self._dissolve(layer_zoneP0B_voronoi, 'zoneP0B_voronoi_dissolve')
 
         layer_zoneP0B_voronoi_dissolve = self._createVectorLayer('zoneP0B_voronoi_dissolve')
-        processing.run("native:multiparttosingleparts", {
-            'INPUT': layer_zoneP0B_voronoi_dissolve,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_singleparts\" (geom)'
-        })
+        self._multiparttosingleparts(layer_zoneP0B_voronoi_dissolve, 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zoneP0B_singleparts\" (geom)')
 
         layer_zoneP0B_singleparts = self._createVectorLayer('zoneP0B_singleparts')
         layer_zoneP0B_singleparts.selectByExpression('$area = maximum($area, "zone_id")')
@@ -74,21 +62,14 @@ class GtfsZones:
             layer_zoneI = self._createVectorLayer('stops_zone' + i)
 
             # select voronoi polygons intersect with stops
-            processing.run("qgis:selectbylocation", {
-                'INPUT': layer_voronoi,
-                'INTERSECT': layer_zoneI,
-                'METHOD': 0,
-                'PREDICATE': [0]})
+            self._selectbylocation(layer_voronoi, layer_zoneI)
 
             self._saveIntoGpkg(layer_voronoi, 'zone' + i + '_voronoi')
 
             layer_zoneI_voronoi = self._createVectorLayer('zone' + i + '_voronoi')
 
             # combine features into new features
-            processing.run("qgis:dissolve", {
-                'FIELD': [],
-                'INPUT': layer_zoneI_voronoi,
-                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + i + '_voronoi_dissolve\" (geom)'})
+            self._dissolve(layer_zoneI_voronoi, 'zone' + i + '_voronoi_dissolve')
 
             list_zones.append(self.gpkg_path + '|layername=zone' + i + '_voronoi_dissolve')
         list_zones.append(self.gpkg_path + '|layername=zoneP0B_without_holes')
@@ -104,10 +85,7 @@ class GtfsZones:
         self._deleteLayer('zoneP0B_max')
 
         # merge layers of all zones
-        processing.run("qgis:mergevectorlayers", {
-            'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
-            'LAYERS': list_zones,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones\" (geom)'})
+        self._mergevectorlayers(list_zones, 'zones')
 
         # insert zones layer to gtfs import group
         zones_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones'), False)
@@ -154,6 +132,34 @@ class GtfsZones:
         options.destCRS = QgsCoordinateReferenceSystem(4326)
         QgsVectorFileWriter.writeAsVectorFormat(layer, self.gpkg_path, options)
 
+    def _dissolve(self, input, output, field = []):
+        return processing.run("qgis:dissolve", {
+                'FIELD': field,
+                'INPUT': input,
+                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"' + output + '\" (geom)'
+        })
+
+    def _selectbylocation(self, input, intersect, method = 0, predicate = [0]):
+        return processing.run("qgis:selectbylocation", {
+            'INPUT': input,
+            'INTERSECT': intersect,
+            'METHOD': method,
+            'PREDICATE': predicate
+        })
+
+    def _mergevectorlayers(self, layers, output, crs = QgsCoordinateReferenceSystem('EPSG:4326')):
+        return processing.run("qgis:mergevectorlayers", {
+            'CRS': crs,
+            'LAYERS': layers,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"' + output + '\" (geom)'
+        })
+
+    def _multiparttosingleparts(self, input, output):
+        return processing.run("native:multiparttosingleparts", {
+            'INPUT': input,
+            'OUTPUT': output
+        })
+
     def _smooth(self):
         '''
         Extract Vertices >>> Merge vector layers >>> Concave hull (alpha shapes) >>> Simplify >>> Smooth
@@ -197,11 +203,7 @@ class GtfsZones:
         list_zones_diff.append(list_zones_smoothed[0])
         list_zones_diff.append(self.gpkg_path + '|layername=zoneP0B_concaveHull_smoothed')
 
-        processing.run("qgis:mergevectorlayers", {
-            'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
-            'LAYERS': list_zones_diff,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed\" (geom)'
-        })
+        self._mergevectorlayers(list_zones_diff, 'zones_smoothed')
 
         processing.run("qgis:collect", {
             'INPUT': self.gpkg_path + '|layername=zones_smoothed',
@@ -216,6 +218,10 @@ class GtfsZones:
 
 
     def _smooth_process(self, zone_id, expression):
+        '''
+        select border stops >>> Extract vertices >>> Concave Hull >>> Simplify Geometries >>> Smooth
+        '''
+
         layer_stops = self._createVectorLayer('stops')
         layer_stops.selectByExpression(expression)
         self._saveIntoGpkg(layer_stops, 'stops_border_zone' + zone_id)
@@ -233,11 +239,7 @@ class GtfsZones:
                                 self.gpkg_path + '|layername=stops_border_zone' + zone_id, 
                                 self.gpkg_path + '|layername=zone' + zone_id + '_vertices']
 
-        processing.run("qgis:mergevectorlayers", {
-            'CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
-            'LAYERS': zoneI_vertices_stops,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_vertices_stops\" (geom)'
-        })
+        self._mergevectorlayers(zoneI_vertices_stops, 'zone' + zone_id + '_vertices_stops')
 
         processing.run("qgis:concavehull", {
             'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_vertices_stops',
@@ -280,27 +282,15 @@ class GtfsZones:
 
         layer_border = self._createVectorLayer('stops_border_zone' + zone_id)
         layer_voronoi = self._createVectorLayer('voronoi')
-        processing.run("qgis:selectbylocation", {
-                'INPUT': layer_voronoi,
-                'INTERSECT': layer_border,
-                'METHOD': 0,
-                'PREDICATE': [0]
-            })
+        self._selectbylocation(layer_voronoi, layer_border)
 
         self._saveIntoGpkg(layer_voronoi, 'border_voronoi_zone' + zone_id)
         layer_border_zone_voronoi = self._createVectorLayer('border_voronoi_zone' + zone_id)
 
-        processing.run("qgis:dissolve", {
-            'FIELD': [],
-            'INPUT': layer_border_zone_voronoi,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_zone' + zone_id + '\" (geom)'
-        })
+        self._dissolve(layer_border_zone_voronoi, 'border_voronoi_dissolve_zone' + zone_id)
 
         layer_border_voronoi_dissolve_zone = self._createVectorLayer('border_voronoi_dissolve_zone' + zone_id)
-        processing.run("native:multiparttosingleparts", {
-            'INPUT': layer_border_voronoi_dissolve_zone,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_singleparts_zone' + zone_id + '\" (geom)'
-        })
+        self._multiparttosingleparts(layer_border_voronoi_dissolve_zone, 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_singleparts_zone' + zone_id + '\" (geom)')
 
         layer_border_voronoi_dissolve_singleparts_zone = self._createVectorLayer('border_voronoi_dissolve_singleparts_zone' + zone_id)
         processing.run("native:countpointsinpolygon", {
