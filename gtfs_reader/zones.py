@@ -160,6 +160,15 @@ class GtfsZones:
             'OUTPUT': output
         })
 
+    def _smoothgeometry(self, input, output, iterations = 10, offset = 0.25, max_angle = 180):
+        return processing.run('qgis:smoothgeometry', {
+            'INPUT': self.gpkg_path + '|layername=' + input,
+            'ITERATIONS': iterations,
+            'OFFSET': offset,
+            'MAX_ANGLE': max_angle,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"' + output + '\" (geom)'
+        })
+
     def _smooth(self):
         '''
         Extract Vertices >>> Merge vector layers >>> Concave hull (alpha shapes) >>> Simplify >>> Smooth
@@ -256,13 +265,15 @@ class GtfsZones:
             'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_simplified\" (geom)'
         })
 
-        processing.run('qgis:smoothgeometry', {
-            'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_concaveHull_simplified',
-            'ITERATIONS': 10,
-            'OFFSET': 0.25,
-            'MAX_ANGLE': 180,
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_smoothed\" (geom)'
-        })
+        self._smoothgeometry('zone' + zone_id + '_concaveHull_simplified', 'zone' + zone_id + '_concaveHull_smoothed')
+        self._smoothgeometry('border_voronoi_dissolve_singleparts_counted_zone' + zone_id + '_moreThanTwo', 'border_zone' + zone_id +'_smooth')
+        # processing.run('qgis:smoothgeometry', {
+        #     'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_concaveHull_simplified',
+        #     'ITERATIONS': 10,
+        #     'OFFSET': 0.25,
+        #     'MAX_ANGLE': 180,
+        #     'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_smoothed\" (geom)'
+        # })
 
         layer = self._createVectorLayer('zone' + zone_id + '_concaveHull_smoothed')
 
