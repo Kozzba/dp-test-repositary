@@ -220,6 +220,8 @@ class GtfsZones:
         layer_stops.selectByExpression(expression)
         self._saveIntoGpkg(layer_stops, 'stops_border_zone' + zone_id)
 
+        self._border_zones(zone_id)
+
         # extract vertices (polygon to nodes)
         processing.run('qgis:extractvertices', {
             'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_voronoi_dissolve',
@@ -269,3 +271,45 @@ class GtfsZones:
         layer.commitChanges()
 
         self._saveIntoGpkg(layer,'zone' + zone_id + '_concaveHull_smoothed')
+
+    def _border_zones(self, zone_id):
+        '''
+        border layer and voronoi layer >>> Select by location >>> Dissolve >>> Multipart to singleparts >>>
+        Count Points in Polygon
+        '''
+
+        layer_border = self._createVectorLayer('stops_border_zone' + zone_id)
+        layer_voronoi = self._createVectorLayer('voronoi')
+        processing.run("qgis:selectbylocation", {
+                'INPUT': layer_voronoi,
+                'INTERSECT': layer_border,
+                'METHOD': 0,
+                'PREDICATE': [0]
+            })
+
+        self._saveIntoGpkg(layer_voronoi, 'border_voronoi_zone' + zone_id)
+        layer_border_zone_voronoi = self._createVectorLayer('border_voronoi_zone' + zone_id)
+
+        processing.run("qgis:dissolve", {
+            'FIELD': [],
+            'INPUT': layer_border_zone_voronoi,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_zone' + zone_id + '\" (geom)'
+        })
+
+        layer_border_voronoi_dissolve_zone = self._createVectorLayer('border_voronoi_dissolve_zone' + zone_id)
+        processing.run("native:multiparttosingleparts", {
+            'INPUT': layer_border_voronoi_dissolve_zone,
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_singleparts_zone' + zone_id + '\" (geom)'
+        })
+
+        layer_border_voronoi_dissolve_singleparts_zone = self._createVectorLayer('border_voronoi_dissolve_singleparts_zone' + zone_id)
+        processing.run("native:countpointsinpolygon", {
+            'POLYGONS': layer_border_voronoi_dissolve_singleparts_zone,
+            'POINTS': layer_border,
+            'FIELD': 'NUMPOINTS',
+            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_voronoi_dissolve_singleparts_counted_zone' + zone_id + '\" (geom)'
+        })
+
+        layer_border_voronoi_dissolve_singleparts_counted_zone = self._createVectorLayer('border_voronoi_dissolve_singleparts_counted_zone' + zone_id)
+        layer_border_voronoi_dissolve_singleparts_counted_zone.selectByExpression('NUMPOINTS > 2')
+        self._saveIntoGpkg(layer_border_voronoi_dissolve_singleparts_counted_zone, 'border_voronoi_dissolve_singleparts_counted_zone' + zone_id + '_moreThanTwo')
