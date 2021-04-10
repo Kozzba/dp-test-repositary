@@ -169,6 +169,20 @@ class GtfsZones:
             'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"' + output + '\" (geom)'
         })
 
+    def _collect(self, input, field, output):
+        return processing.run("qgis:collect", {
+            'INPUT': input,
+            'FIELD': field,
+            'OUTPUT': output
+        })
+
+    def _difference(self, input, overlay, output):
+        return processing.run("qgis:difference", {
+            'INPUT': input,
+            'OVERLAY': overlay,
+            'OUTPUT': output
+        })
+
     def _smooth(self):
         '''
         Extract Vertices >>> Merge vector layers >>> Concave hull (alpha shapes) >>> Simplify >>> Smooth
@@ -179,19 +193,16 @@ class GtfsZones:
         self._smooth_process('P0B', expressionP0B)
 
         list_zones_smoothed = []
+        list_border_zones_smoothed = []
         for i in self.zones:
 
             self._smooth_process(i,"zone_id LIKE '" + i + "," + str(int(i)+1) + "'")
 
             list_zones_smoothed.append(self.gpkg_path + '|layername=zone' + i + '_concaveHull_smoothed')
-
+            list_border_zones_smoothed.append(self.gpkg_path + '|layername=border_zone' + i + '_smooth')
         list_zones_diff = []
         for i in range(len(list_zones_smoothed) - 1):
-            processing.run("qgis:difference", {
-                'INPUT': list_zones_smoothed[i+1],
-                'OVERLAY': list_zones_smoothed[i],
-                'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)'
-            })
+            self._difference(list_zones_smoothed[i+1], list_zones_smoothed[i], 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + str(i+1) + '_smoothed_diff\" (geom)')
 
             diff = self._createVectorLayer('zone' + str(i+1) + '_smoothed_diff')
 
@@ -213,16 +224,18 @@ class GtfsZones:
         list_zones_diff.append(self.gpkg_path + '|layername=zoneP0B_concaveHull_smoothed')
 
         self._mergevectorlayers(list_zones_diff, 'zones_smoothed')
+        self._mergevectorlayers(list_border_zones_smoothed, 'border_zones_smoothed')
 
-        processing.run("qgis:collect", {
-            'INPUT': self.gpkg_path + '|layername=zones_smoothed',
-            'FIELD': ['zone_id'],
-            'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed_collected\" (geom)'
-        })
+        self._collect(self.gpkg_path + '|layername=border_zones_smoothed', ['zone_id'], 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"border_zones_smoothed_collected\" (geom)')
+        self._collect(self.gpkg_path + '|layername=zones_smoothed', ['zone_id'], 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed_collected\" (geom)')
+
+        self._difference(self.gpkg_path + '|layername=zones_smoothed_collected', self.gpkg_path + '|layername=border_zones_smoothed_collected', 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zones_smoothed_collected_diff\" (geom)')
+
+        self._mergevectorlayers([self.gpkg_path + '|layername=zones_smoothed_collected_diff', self.gpkg_path + '|layername=border_zones_smoothed_collected'], 'zones_borders_smoothed_collected')
 
         root = QgsProject.instance().layerTreeRoot()
         group_gtfs = root.findGroup('zones')
-        smooth_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones_smoothed_collected'), False)
+        smooth_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones_borders_smoothed_collected'), False)
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(smooth_layer))
 
 
@@ -267,13 +280,6 @@ class GtfsZones:
 
         self._smoothgeometry('zone' + zone_id + '_concaveHull_simplified', 'zone' + zone_id + '_concaveHull_smoothed')
         self._smoothgeometry('border_voronoi_dissolve_singleparts_counted_zone' + zone_id + '_moreThanTwo', 'border_zone' + zone_id +'_smooth')
-        # processing.run('qgis:smoothgeometry', {
-        #     'INPUT': self.gpkg_path + '|layername=zone' + zone_id + '_concaveHull_simplified',
-        #     'ITERATIONS': 10,
-        #     'OFFSET': 0.25,
-        #     'MAX_ANGLE': 180,
-        #     'OUTPUT': 'ogr:dbname=\'' + self.gpkg_path + '\' table=\"zone' + zone_id + '_concaveHull_smoothed\" (geom)'
-        # })
 
         layer = self._createVectorLayer('zone' + zone_id + '_concaveHull_smoothed')
 
