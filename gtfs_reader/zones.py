@@ -181,7 +181,7 @@ class GtfsZones:
         list_zones_smoothed = []
         for i in self.zones:
 
-            self._smooth_process(i,"zone_id LIKE '" + i + ",%' OR zone_id LIKE '%," + i + "'")
+            self._smooth_process(i,"zone_id LIKE '" + i + "," + str(int(i)+1) + "'")
 
             list_zones_smoothed.append(self.gpkg_path + '|layername=zone' + i + '_concaveHull_smoothed')
 
