@@ -1,6 +1,7 @@
 from qgis import processing
 from qgis.core import QgsVectorLayer, QgsProject, QgsVectorFileWriter, QgsCoordinateReferenceSystem, QgsLayerTreeLayer, \
-    QgsDistanceArea
+    QgsDistanceArea, QgsSymbol, QgsRendererCategory, QgsCategorizedSymbolRenderer
+from PyQt5.QtGui import QColor
 
 
 class GtfsZones:
@@ -236,6 +237,7 @@ class GtfsZones:
         root = QgsProject.instance().layerTreeRoot()
         group_gtfs = root.findGroup('zones')
         smooth_layer = QgsProject.instance().addMapLayer(self._createVectorLayer('zones_borders_smoothed_collected'), False)
+        self._set_zone_colors(smooth_layer)
         group_gtfs.insertChildNode(0, QgsLayerTreeLayer(smooth_layer))
 
 
@@ -320,3 +322,41 @@ class GtfsZones:
         layer_border_voronoi_dissolve_singleparts_counted_zone = self._createVectorLayer('border_voronoi_dissolve_singleparts_counted_zone' + zone_id)
         layer_border_voronoi_dissolve_singleparts_counted_zone.selectByExpression('NUMPOINTS > 2')
         self._saveIntoGpkg(layer_border_voronoi_dissolve_singleparts_counted_zone, 'border_voronoi_dissolve_singleparts_counted_zone' + zone_id + '_moreThanTwo')
+
+    def _set_zone_colors(self, zones_layer):
+        '''
+        Function, that sets color of each zone
+
+        input: vector layer zones
+        '''
+        # zone: #color
+        colors = {
+            'P0B': '#c02026',
+            '1': '#d65e27',
+            '1,2': '#d65e27',
+            '2': '#e58027',
+            '2,3': '#e58027',
+            '3': '#f3a228',
+            '4': '#fabc29',
+            '4,5': '#fabc29',
+            '5': '#ffd12a',
+            '5,6': '#ffd12a',
+            '6': '#d6c034',
+            '6,7': '#d6c034',
+            '7': '#9aaa3e',
+            '7,8': '#9aaa3e',
+            '8': '#5a8e40',
+            '8,9': '#5a8e40',
+            '9': '#188041'
+        }
+
+        target_field = 'zone_id'
+        myCategoryList = []
+        for r_fid, r_item in colors.items():
+            symbol = QgsSymbol.defaultSymbol(zones_layer.geometryType())
+            symbol.setColor(QColor(r_item))
+            myCategory = QgsRendererCategory(r_fid, symbol, r_fid)
+            myCategoryList.append(myCategory)
+            myRenderer = QgsCategorizedSymbolRenderer(target_field, myCategoryList)
+            zones_layer.setRenderer(myRenderer)
+        zones_layer.triggerRepaint()
